@@ -3,6 +3,8 @@
 OOP - Ex4
 Very simple GUI example for python client to communicates with the server and "play the game!"
 """
+from Graph.GraphAlgo import GraphAlgo
+from Graph.Classes import DiGraph
 from types import SimpleNamespace
 from client import Client
 import json
@@ -36,15 +38,18 @@ graph_json = client.get_graph()
 FONT = pygame.font.SysFont('Arial', 20, bold=True)
 # load the json string into SimpleNamespace Object
 
-# TODO: integrate our graph
-graph = json.loads(
-    graph_json, object_hook=lambda json_dict: SimpleNamespace(**json_dict))
-
+# TODO: integrate our graph - remake json load so it'll get str
+# graph = json.loads(graph_json, object_hook=lambda json_dict: SimpleNamespace(**json_dict))
+graph = DiGraph()
+dga = GraphAlgo(graph)
+dga.load_from_json(graph_json)
+nodes = graph.get_all_v()
+# TODO: get data proportions using node.loc
 for n in graph.Nodes:
     x, y, _ = n.pos.split(',')
     n.pos = SimpleNamespace(x=float(x), y=float(y))
 
- # get data proportions
+# get data proportions
 min_x = min(list(graph.Nodes), key=lambda n: n.pos.x).pos.x
 min_y = min(list(graph.Nodes), key=lambda n: n.pos.y).pos.y
 max_x = max(list(graph.Nodes), key=lambda n: n.pos.x).pos.x
@@ -56,25 +61,24 @@ def scale(data, min_screen, max_screen, min_data, max_data):
     get the scaled data with proportions min_data, max_data
     relative to min and max screen dimentions
     """
-    return ((data - min_data) / (max_data-min_data)) * (max_screen - min_screen) + min_screen
+    return ((data - min_data) / (max_data - min_data)) * (max_screen - min_screen) + min_screen
 
 
 # decorate scale with the correct values
-
 def my_scale(data, x=False, y=False):
     if x:
         return scale(data, 50, screen.get_width() - 50, min_x, max_x)
     if y:
-        return scale(data, 50, screen.get_height()-50, min_y, max_y)
+        return scale(data, 50, screen.get_height() - 50, min_y, max_y)
 
 
 radius = 15
 
-# TODO: find a way to get number of agents in order to add them all when possible
-client.add_agent("{\"id\":0}")
-# client.add_agent("{\"id\":1}")
-# client.add_agent("{\"id\":2}")
-# client.add_agent("{\"id\":3}")
+# add all agents
+info = json.loads(client.get_info())
+agents_amount = info["agents"]
+for i in range(0, agents_amount):
+    client.add_agent("{\"id\":%d}" % i)
 
 # this command starts the server - the game is running now
 client.start()
@@ -92,6 +96,7 @@ while client.is_running() == 'true':
         x, y, _ = p.pos.split(',')
         p.pos = SimpleNamespace(x=my_scale(
             float(x), x=True), y=my_scale(float(y), y=True))
+
     agents = json.loads(client.get_agents(),
                         object_hook=lambda d: SimpleNamespace(**d)).Agents
     agents = [agent.Agent for agent in agents]
@@ -99,6 +104,7 @@ while client.is_running() == 'true':
         x, y, _ = a.pos.split(',')
         a.pos = SimpleNamespace(x=my_scale(
             float(x), x=True), y=my_scale(float(y), y=True))
+
     # check events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -113,7 +119,7 @@ while client.is_running() == 'true':
         x = my_scale(n.pos.x, x=True)
         y = my_scale(n.pos.y, y=True)
 
-        # its just to get a nice antialiased circle
+        # its just to get a nice antialias circle
         gfxdraw.filled_circle(screen, int(x), int(y),
                               radius, Color(64, 80, 174))
         gfxdraw.aacircle(screen, int(x), int(y),
@@ -145,13 +151,17 @@ while client.is_running() == 'true':
         pygame.draw.circle(screen, Color(232, 18, 49),
                            (int(agent.pos.x), int(agent.pos.y)), 10)
     # draw pokemons
-    # TODO: make directed triangles, up-facing for 1, down-facing for -1
-    # in the same way).
+    # makes directed triangles, up-facing for 1, down-facing for -1
     for p in pokemons:
+        r = 10  # radius
+        x_p = int(p.pos.x)
+        y_p = int(p.pos.y)
         if p.type == -1:
-            pygame.draw.circle(screen, Color(53, 232, 211), (int(p.pos.x), int(p.pos.y)), 10)
+            pos = [[x_p, y_p + r], [x_p - r, y_p - r], [x_p + r, y_p - r]]
+            pygame.draw.polygon(screen, Color(53, 232, 211), pos)
         elif p.type == 1:
-            pygame.draw.circle(screen, Color(232, 165, 32), (int(p.pos.x), int(p.pos.y)), 10)
+            pos = [[x_p, y_p - r], [x_p - r, y_p + r], [x_p + r, y_p + r]]
+            pygame.draw.polygon(screen, Color(232, 165, 32), pos)
 
     # update screen changes
     display.update()
@@ -164,7 +174,7 @@ while client.is_running() == 'true':
         if agent.dest == -1:
             next_node = (agent.src - 1) % len(graph.Nodes)
             client.choose_next_edge(
-                '{"agent_id":'+str(agent.id)+', "next_node_id":'+str(next_node)+'}')
+                '{"agent_id":' + str(agent.id) + ', "next_node_id":' + str(next_node) + '}')
             ttl = client.time_to_end()
             print(ttl, client.get_info())
 
