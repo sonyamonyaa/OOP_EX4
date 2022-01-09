@@ -47,8 +47,8 @@ class Client:
     def add_agent(self, json_of_node):
         """
         param json_of_node should be in this format: '{"id":0}'
-        (replace 0 with the desired starting node for the agent.)
-        returns 'true' (as str) iff the agent has been added succesfuly
+        (replace 0 with the desired starting node for the Agent.)
+        returns 'true' (as str) iff the Agent has been added succesfuly
         """
         res = self.__send_message("addAgent")
         if res == "getNode":
@@ -113,7 +113,7 @@ class Client:
     def get_pokemons(self):
         """
         returns the current pokemons state as json str.\n
-        for pokemon lying on edge (src,dest), then:\n
+        for Pokemon lying on edge (src,dest), then:\n
         src < dest => type > 0\n
         dest < src => type < 0\n
         example:\n
@@ -172,12 +172,12 @@ class Client:
 
     def choose_next_edge(self, next_agent_node_json):
         """
-        choosing the next destination for a specific agent.
+        choosing the next destination for a specific Agent.
         param: next_agent_node_json should be in format:\n
         '{"agent_id":0, "next_node_id":1}'.
         Note that if\n
-        1. the agent is still moving on some edge, (a.k. agent.dest != -1)
-        or 2. the "next_node_id" isn't an adjacent vertex of agent.src,
+        1. the Agent is still moving on some edge, (a.k. Agent.dest != -1)
+        or 2. the "next_node_id" isn't an adjacent vertex of Agent.src,
         then move() won't be affected by this invalid "next_node_id" choice.
         """
         res = self.__send_message("chooseNextEdge")

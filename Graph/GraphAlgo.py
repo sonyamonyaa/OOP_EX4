@@ -197,29 +197,3 @@ class GraphAlgo(GraphAlgoInterface):
                 return rout.rout, rout.weight
 
         return None, None
-
-    def plot_graph(self) -> None:
-        import matplotlib.pyplot as plt
-
-        G = self.get_graph()
-
-        LocData = [(node.loc[0], node.loc[1]) for node in G.get_all_v().values()]
-
-        LocData = list(map(list, zip(*LocData)))
-        x = LocData[0]
-        y = LocData[1]
-
-        plt.scatter(x, y, s=70)
-        for src in G.get_all_v().keys():
-            for dst in G.all_out_edges_of_node(src).keys():
-                node = G.nodes[src]
-                x = node.loc[0]
-                y = node.loc[1]
-                node = G.nodes[dst]
-                dx = node.loc[0] - x
-                dy = node.loc[1] - y
-
-                plt.arrow(x, y, dx, dy, width=0.00005, shape='full', color='g', length_includes_head=True)
-                plt.annotate(str(G.edges[src][dst]), (x, y), (x + 0.7 * dx, y + 0.7 * dy), fontsize=4)
-
-        plt.show()

@@ -187,7 +187,7 @@ class Path:
         if self.get_length() == 0:
             return None
 
-        return self.rout[self.get_length() -1]
+        return self.rout[self.get_length() - 1]
 
     def __repr__(self):
         return self.rout.__repr__()

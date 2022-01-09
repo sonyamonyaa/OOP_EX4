@@ -5,15 +5,18 @@ Very simple GUI example for python client to communicates with the server and "p
 """
 from Graph.GraphAlgo import GraphAlgo
 from Graph.Classes import DiGraph
-from types import SimpleNamespace
 from client import Client
 import json
 from pygame import gfxdraw
 import pygame
 from pygame import *
+import pygame_widgets as pw
+import pyautogui
+import Game
+from Game import Agent, Pokemon
 
 # init pygame
-WIDTH, HEIGHT = 1080, 720
+WIDTH, HEIGHT = pyautogui.size()
 
 # default port
 PORT = 6666
@@ -28,32 +31,56 @@ pygame.font.init()
 client = Client()
 client.start_connection(HOST, PORT)
 
-pokemons = client.get_pokemons()
-pokemons_obj = json.loads(pokemons, object_hook=lambda d: SimpleNamespace(**d))
+button = pw.Button(
+    screen, 100, 100,  # coordinates
+    300, 150,  # dimensions
+    text='stop the game',
+    fontSize=50, margin=20,
+    inactiveColour=(255, 0, 0),
+    pressedColour=(0, 255, 0), radius=20,
+    onClick=lambda: client.stop()
+)
 
+pokemons = client.get_pokemons()
 print(pokemons)
 
 graph_json = client.get_graph()
 
 FONT = pygame.font.SysFont('Arial', 20, bold=True)
-# load the json string into SimpleNamespace Object
 
-# TODO: integrate our graph - remake json load so it'll get str
-# graph = json.loads(graph_json, object_hook=lambda json_dict: SimpleNamespace(**json_dict))
 graph = DiGraph()
 dga = GraphAlgo(graph)
 dga.load_from_json(graph_json)
-nodes = graph.get_all_v()
-# TODO: get data proportions using node.loc
-for n in graph.Nodes:
-    x, y, _ = n.pos.split(',')
-    n.pos = SimpleNamespace(x=float(x), y=float(y))
+nodes = dga.get_graph().get_all_v().values()
+center = dga.centerPoint().id
+
 
 # get data proportions
-min_x = min(list(graph.Nodes), key=lambda n: n.pos.x).pos.x
-min_y = min(list(graph.Nodes), key=lambda n: n.pos.y).pos.y
-max_x = max(list(graph.Nodes), key=lambda n: n.pos.x).pos.x
-max_y = max(list(graph.Nodes), key=lambda n: n.pos.y).pos.y
+def min_scales():
+    minx = 9999999999
+    miny = 9999999999
+    for n in nodes:
+        if n.pos[0] < minx:
+            minx = n.pos[0]
+        if n.pos[1] < miny:
+            miny = n.pos[1]
+
+    return minx, miny
+
+
+def max_scales():
+    maxx = -9999999999
+    maxy = -9999999999
+    for n in nodes:
+        if n.pos[0] > maxx:
+            maxx = n.pos[0]
+        if n.pos[1] > maxy:
+            maxy = n.pos[1]
+    return maxx, maxy
+
+
+min_x, min_y = min_scales()
+max_x, max_y = max_scales()
 
 
 def scale(data, min_screen, max_screen, min_data, max_data):
@@ -74,11 +101,11 @@ def my_scale(data, x=False, y=False):
 
 radius = 15
 
-# add all agents
+# add all agents - start point at graph's center
 info = json.loads(client.get_info())
-agents_amount = info["agents"]
+agents_amount = info['GameServer']['agents']
 for i in range(0, agents_amount):
-    client.add_agent("{\"id\":%d}" % i)
+    client.add_agent("{\"id\":%d}" % center)
 
 # this command starts the server - the game is running now
 client.start()
@@ -87,27 +114,26 @@ client.start()
 The code below should be improved significantly:
 The GUI and the "algo" are mixed - refactoring using MVC design pattern is required.
 """
-# TODO: separate gui and algo stuff
-while client.is_running() == 'true':
-    pokemons = json.loads(client.get_pokemons(),
-                          object_hook=lambda d: SimpleNamespace(**d)).Pokemons
-    pokemons = [p.Pokemon for p in pokemons]
-    for p in pokemons:
-        x, y, _ = p.pos.split(',')
-        p.pos = SimpleNamespace(x=my_scale(
-            float(x), x=True), y=my_scale(float(y), y=True))
 
-    agents = json.loads(client.get_agents(),
-                        object_hook=lambda d: SimpleNamespace(**d)).Agents
-    agents = [agent.Agent for agent in agents]
-    for a in agents:
-        x, y, _ = a.pos.split(',')
-        a.pos = SimpleNamespace(x=my_scale(
-            float(x), x=True), y=my_scale(float(y), y=True))
+while client.is_running() == 'true':
+    pokemon_json = json.loads(pokemons)
+    pokemon_list = Game.load_pokemon(pokemon_json)
+
+    for p in pokemon_list:
+        x, y = p.pos
+        p.dis_pos = (my_scale(float(x), x=True), my_scale(float(y), y=True))
+
+    agents_json = json.loads(client.get_agents())
+    agents_list = Game.load_agents(agents_json)
+
+    for a in agents_list:
+        x, y = a.pos
+        a.dis_pos = (my_scale(float(x), x=True), my_scale(float(y), y=True))
 
     # check events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            client.stop_connection()
             pygame.quit()
             exit(0)
 
@@ -115,9 +141,9 @@ while client.is_running() == 'true':
     screen.fill(Color(0, 0, 0))
 
     # draw nodes
-    for n in graph.Nodes:
-        x = my_scale(n.pos.x, x=True)
-        y = my_scale(n.pos.y, y=True)
+    for n in nodes:
+        x = my_scale(n.pos[0], x=True)
+        y = my_scale(n.pos[1], y=True)
 
         # its just to get a nice antialias circle
         gfxdraw.filled_circle(screen, int(x), int(y),
@@ -131,31 +157,31 @@ while client.is_running() == 'true':
         screen.blit(id_srf, rect)
 
     # draw edges
-    for e in graph.Edges:
-        # find the edge nodes
-        src = next(n for n in graph.Nodes if n.id == e.src)
-        dest = next(n for n in graph.Nodes if n.id == e.dest)
+    for n in nodes:
+        for e in dga.get_graph().all_out_edges_of_node(n):
+            # find the edge nodes
+            src = dga.get_graph().nodes[n]
+            dest = dga.get_graph()
 
-        # scaled positions
-        src_x = my_scale(src.pos.x, x=True)
-        src_y = my_scale(src.pos.y, y=True)
-        dest_x = my_scale(dest.pos.x, x=True)
-        dest_y = my_scale(dest.pos.y, y=True)
+            # scaled positions
+            src_x = my_scale(src.pos[0], x=True)
+            src_y = my_scale(src.pos[1], y=True)
+            dest_x = my_scale(dest.pos[0], x=True)
+            dest_y = my_scale(dest.pos[1], y=True)
 
-        # draw the line
-        pygame.draw.line(screen, Color(61, 72, 126),
-                         (src_x, src_y), (dest_x, dest_y))
+            # draw the line
+            pygame.draw.line(screen, Color(61, 72, 126), (src_x, src_y), (dest_x, dest_y))
 
     # draw agents
-    for agent in agents:
+    for agent in agents_list:
         pygame.draw.circle(screen, Color(232, 18, 49),
                            (int(agent.pos.x), int(agent.pos.y)), 10)
     # draw pokemons
     # makes directed triangles, up-facing for 1, down-facing for -1
-    for p in pokemons:
-        r = 10  # radius
-        x_p = int(p.pos.x)
-        y_p = int(p.pos.y)
+    for p in pokemon_list:
+        r = 10  # triangle 'radius'
+        x_p = p.dis_pos[0]
+        y_p = p.dis_pos[1]
         if p.type == -1:
             pos = [[x_p, y_p + r], [x_p - r, y_p - r], [x_p + r, y_p - r]]
             pygame.draw.polygon(screen, Color(53, 232, 211), pos)
@@ -169,14 +195,85 @@ while client.is_running() == 'true':
     # refresh rate
     clock.tick(60)
 
+    # TODO: get src dest edge of a pokemon - e_src e_dest
+    # finds the edge a pokemon is placed on, returns the src and dest of that edge
+    # assuming for every edge there's am opposite
+    def pokemon_src_dest(pokemon):
+        edges = dga.get_graph().edges
+        # nodes = dga.get_graph().nodes
+        py = pokemon.pos[1]
+        px = pokemon.pos[0]
+        for src in edges.keys():
+            for dest in edges[src].key:
+                e_src = dga.get_graph().nodes[src].pos
+                e_dest = dga.get_graph().nodes[dest].pos  # idk how to get dest
+                sy = e_src[1]
+                dy = e_dest[1]
+                sx = e_src[0]
+                dx = e_dest[0]
+                x_within = (sx <= px <= dx) or (sx >= px >= dx)
+                y_within = (sy <= py <= dy) or (sy >= py >= dy)
+                if x_within and y_within:
+                    # src < dest => type > 0
+                    # src > dest => type < 0
+                    if pokemon.type == -1:
+                        if n.id < e:  # if src < dest return dest, src
+                            return e, n.id
+                        if e < n.id:  # if src > dest return src, dest
+                            return n.id, e
+                    if pokemon.type == 1:
+                        if n.id < e:  # if src < dest return src, dest
+                            return n.id, e
+                        if e < n.id:  # if src > dest return dest, src
+                            return e, n.id
+        return -1
+
+    # TODO get an agent's travel cost to a pokemon
+    def pokemon_cost(pkmn: Pokemon, agnt: Agent):
+        cost = -1
+        s, d = pokemon_src_dest(pkmn)
+        up_type = pkmn.type == 1
+        bigger_d = s < d
+        if (not up_type and not bigger_d) or (up_type and bigger_d):
+                w, rt = dga.shortest_path(agnt.src, s)
+                # cost = (w + edge[src][dest]) / pkmn.value
+
+        if (up_type and not bigger_d) or (not up_type and bigger_d):
+                w, rt = dga.shortest_path(agnt.src, d)
+                # cost = (w + edge[dest][src]) / pkmn.value
+        return cost
+
+
     # choose next edge
-    for agent in agents:
+    for agent in agents_list:
         if agent.dest == -1:
-            next_node = (agent.src - 1) % len(graph.Nodes)
-            client.choose_next_edge(
-                '{"agent_id":' + str(agent.id) + ', "next_node_id":' + str(next_node) + '}')
-            ttl = client.time_to_end()
-            print(ttl, client.get_info())
+
+            min_cost = 99999999999999
+            temp_pokemon = None
+
+            for p in pokemon_list:
+                if p.tag == -1:
+                    if pokemon_cost(p, agent) < min_cost:
+                        min_cost = pokemon_cost(p, agent)
+                        temp_pokemon = p
+
+            if temp_pokemon is not None:
+                temp_pokemon.tag = 1
+                start_e, end_e = pokemon_src_dest(temp_pokemon)
+
+                weight, path = dga.shortest_path(agent.src, start_e)
+                path.append(end_e)
+                a = 1
+                agent.next_node = path[a]
+
+                client.choose_next_edge(
+                    '{"agent_id":' + str(agent.id) + ', "next_node_id":' + str(agent.next_node) + '}')
+                a += 1
+
+                ttl = client.time_to_end()
+
+    if int(ttl) < 30:
+        print(client.get_info())
 
     client.move()
 # game over:
