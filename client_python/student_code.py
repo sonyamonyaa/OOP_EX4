@@ -3,6 +3,7 @@
 OOP - Ex4
 Very simple GUI example for python client to communicates with the server and "play the game!"
 """
+import math
 from Graph.GraphAlgo import GraphAlgo
 from Graph.Classes import DiGraph
 from client import Client
@@ -54,11 +55,10 @@ dga.load_from_json(graph_json)
 nodes = dga.get_graph().get_all_v().values()
 center = dga.centerPoint().id
 
-
 # get data proportions
 def min_scales():
-    minx = 9999999999
-    miny = 9999999999
+    minx = math.inf
+    miny = math.inf
     for n in nodes:
         if n.pos[0] < minx:
             minx = n.pos[0]
@@ -69,8 +69,8 @@ def min_scales():
 
 
 def max_scales():
-    maxx = -9999999999
-    maxy = -9999999999
+    maxx = -math.inf
+    maxy = -math.inf
     for n in nodes:
         if n.pos[0] > maxx:
             maxx = n.pos[0]
@@ -214,18 +214,12 @@ while client.is_running() == 'true':
                 x_within = (sx <= px <= dx) or (sx >= px >= dx)
                 y_within = (sy <= py <= dy) or (sy >= py >= dy)
                 if x_within and y_within:
-                    # src < dest => type > 0
-                    # src > dest => type < 0
-                    if pokemon.type == -1:
-                        if n.id < e:  # if src < dest return dest, src
-                            return e, n.id
-                        if e < n.id:  # if src > dest return src, dest
-                            return n.id, e
-                    if pokemon.type == 1:
-                        if n.id < e:  # if src < dest return src, dest
-                            return n.id, e
-                        if e < n.id:  # if src > dest return dest, src
-                            return e, n.id
+                    up_type = pokemon.type == 1
+                    bigger_dst = src < dest
+                    if (not up_type and not bigger_dst) or (up_type and bigger_dst):
+                        return src, dest
+                    if (up_type and not bigger_dst) or (not up_type and bigger_dst):
+                        return dest, src
         return -1
 
     # TODO get an agent's travel cost to a pokemon
@@ -233,12 +227,12 @@ while client.is_running() == 'true':
         cost = -1
         s, d = pokemon_src_dest(pkmn)
         up_type = pkmn.type == 1
-        bigger_d = s < d
-        if (not up_type and not bigger_d) or (up_type and bigger_d):
+        bigger_dst = s < d
+        if (not up_type and not bigger_dst) or (up_type and bigger_dst):
                 w, rt = dga.shortest_path(agnt.src, s)
                 # cost = (w + edge[src][dest]) / pkmn.value
 
-        if (up_type and not bigger_d) or (not up_type and bigger_d):
+        if (up_type and not bigger_dst) or (not up_type and bigger_dst):
                 w, rt = dga.shortest_path(agnt.src, d)
                 # cost = (w + edge[dest][src]) / pkmn.value
         return cost
@@ -248,7 +242,7 @@ while client.is_running() == 'true':
     for agent in agents_list:
         if agent.dest == -1:
 
-            min_cost = 99999999999999
+            min_cost = math.inf
             temp_pokemon = None
 
             for p in pokemon_list:
