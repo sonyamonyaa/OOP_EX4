@@ -230,11 +230,11 @@ while client.is_running() == 'true':
         bigger_dst = s < d
         if (not up_type and not bigger_dst) or (up_type and bigger_dst):
                 w, rt = dga.shortest_path(agnt.src, s)
-                # cost = (w + edge[src][dest]) / pkmn.value
+                cost = (w + dga.get_graph().edges[src][dest]) / pkmn.value
 
         if (up_type and not bigger_dst) or (not up_type and bigger_dst):
                 w, rt = dga.shortest_path(agnt.src, d)
-                # cost = (w + edge[dest][src]) / pkmn.value
+                cost = (w + dga.get_graph().edges[dest][src]) / pkmn.value
         return cost
 
 
