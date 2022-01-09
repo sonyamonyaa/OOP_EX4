@@ -204,7 +204,7 @@ while client.is_running() == 'true':
         py = pokemon.pos[1]
         px = pokemon.pos[0]
         for src in edges.keys():
-            for dest in edges[src].key:
+            for dest in edges[src].keys():
                 e_src = dga.get_graph().nodes[src].pos
                 e_dest = dga.get_graph().nodes[dest].pos  # idk how to get dest
                 sy = e_src[1]
